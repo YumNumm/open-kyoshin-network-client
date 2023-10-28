@@ -1,4 +1,4 @@
-FROM node:lts-alpine3.18
+FROM node:lts-alpine3.18 as deps
 
 WORKDIR /app
 
@@ -9,5 +9,6 @@ RUN pnpm install
 
 COPY . .
 
+RUN pnpm build
 
-CMD ["pnpm", "dev"]
+CMD ["pnpm", "start"]
