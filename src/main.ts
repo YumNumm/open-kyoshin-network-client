@@ -36,7 +36,6 @@ port.on("data", (data: string) => {
   ).split(",");
   const trimmedText = csv.join(",");
   // console.log(trimmedText);
-  console.log(csv);
 
   switch (csv[0]) {
     case "$XSINT": {
