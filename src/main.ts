@@ -8,7 +8,6 @@ const port = new SerialPort({
 });
 
 port.on("open", () => {
-  
   console.log("serial port opened");
 });
 
