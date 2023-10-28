@@ -1,0 +1,7 @@
+services:
+  okn-server:
+   build: .
+   privileged: true
+   volumes:
+    - /dev:/dev:rw
+    - /etc/localtime:/etc/localtime:ro
