@@ -22,7 +22,7 @@ const topic = checkEnv(process.env.BROKER_TOPIC);
 let lastXsintText: string | undefined;
 let lastXsintSendTime: number | undefined;
 let lastXsaccSendTime: number | undefined;
-let lastJmaIntensity: JmaForecastIntensity | undefined;
+let lastJmaIntensity: JmaForecastIntensity | null;
 let markAsXassDirty = false;
 
 port.on("data", (data: string) => {
@@ -122,7 +122,7 @@ client.on("message", (topic, message) => {
   }
 });
 
-function toJmaIntensity(param: number): JmaForecastIntensity | undefined {
+function toJmaIntensity(param: number): JmaForecastIntensity | null {
   /*
     JmaForecastIntensity? get toJmaForecastIntensity => switch (this) {
         < -0.5 => null,
@@ -139,7 +139,7 @@ function toJmaIntensity(param: number): JmaForecastIntensity | undefined {
       };
   */
   if (param < -0.5) {
-    return undefined;
+    return null;
   } else if (param < 0.5) {
     return JmaForecastIntensity.zero;
   } else if (param < 1.5) {
@@ -164,14 +164,14 @@ function toJmaIntensity(param: number): JmaForecastIntensity | undefined {
 }
 
 enum JmaForecastIntensity {
-  zero,
-  one,
-  two,
-  three,
-  four,
-  fiveLower,
-  fiveUpper,
-  sixLower,
-  sixUpper,
-  seven,
+  zero = "0",
+  one = "1",
+  two = "2",
+  three = "3",
+  four = "4",
+  fiveLower = "5-",
+  fiveUpper = "5+",
+  sixLower = "6-",
+  sixUpper = "6+",
+  seven = "7",
 }
