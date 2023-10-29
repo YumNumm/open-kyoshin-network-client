@@ -65,7 +65,7 @@ port.on("data", (data: string) => {
             .send({
               topic: "yumnumm-notify",
               notification: {
-                title: "揺れ検出 🫨",
+                title: "🫨 揺れ検出",
                 body: `震度${intensity}が観測されました。 ( ${csv[2]} )`,
               },
               apns: {
@@ -73,11 +73,11 @@ port.on("data", (data: string) => {
                   aps: {
                     threadId: "yumnumm",
                     alert: {
-                      title: "揺れ検出 🫨",
+                      title: "🫨 揺れ検出",
                       body: `震度${intensity}が観測されました。 (${csv[2]})`,
                       subtitle: "自宅 Raspberry PI 4",
                     },
-                    mutableContent: true, 
+                    mutableContent: true,
                     contentAvailable: true,
                     sound: {
                       critical: true,
