@@ -3,6 +3,8 @@ import { checkEnv } from "./util/checkEnv";
 import { client } from "./listen";
 
 import * as admin from "firebase-admin";
+import { type JmaIntensity, getJmaIntensity } from "./types/jma_intensity";
+import { IntensityHandler } from "./handler/intensity";
 
 const port = new SerialPort({
   path: checkEnv(process.env.SERIAL_PATH),
@@ -19,82 +21,65 @@ const topic = checkEnv(process.env.BROKER_TOPIC);
 
 // DATA
 
-let lastXsintText: string | undefined;
-let lastXsintSendTime: number | undefined;
 let lastXsaccSendTime: number | undefined;
-let lastJmaIntensity: JmaForecastIntensity | null;
+let lastJmaIntensity: JmaIntensity | null;
+let lastJmaIntensityUpdatedAt: number = Date.now();
 let markAsXassDirty = false;
+
+const intensityHandler = new IntensityHandler((intensity: JmaIntensity) => {
+  firebaseApp
+    .messaging()
+    .send({
+      topic: "yumnumm-notify",
+      notification: {
+        title: "🫨 揺れ検出",
+        body: `震度${intensity}が観測されました`,
+      },
+      apns: {
+        payload: {
+          aps: {
+            threadId: "yumnumm",
+            mutableContent: true,
+            contentAvailable: true,
+            sound: {
+              critical: true,
+              volume: 0.0,
+              name: "default",
+            },
+          },
+        },
+      },
+    })
+    .then((res) => {
+      console.log(res);
+    })
+    .catch((err) => {
+      console.error(err);
+    });
+});
 
 port.on("data", (data: string) => {
   // split data by comma
-  const csv = (
-    "$" +
-    data
-      .toString()
-      .replace(/(\r\n|\n|\r)/gm, "")
-      .split("$")[1]
-  ).split(",");
-  const trimmedText = csv.join(",");
+  const csv = data.replace(/(\r\n|\n|\r)/gm, "").split(",");
+  const type = csv[0];
   // console.log(trimmedText);
 
-  switch (csv[0]) {
+  switch (type) {
     case "$XSINT": {
+      // $XSINT,-1.000,0.40*40
+      const realTimeIntensity = parseFloat(csv[2].split("*")[0]);
+      const intensity = getJmaIntensity(realTimeIntensity);
+      intensityHandler.handle(intensity);
       // only send if it's been more than 2.5 second since last send
+      // or if the intensity has changed
       if (
-        lastXsintText !== trimmedText ||
-        lastXsintSendTime === undefined ||
-        Date.now() - lastXsintSendTime > 2500
+        lastJmaIntensity === null ||
+        lastJmaIntensity !== intensity ||
+        Date.now() - lastJmaIntensityUpdatedAt > 2500
       ) {
-        if (lastXsintText !== trimmedText) {
-          markAsXassDirty = true;
-        }
-        client.publish(topic, trimmedText);
-        lastXsintText = trimmedText;
-        lastXsintSendTime = Date.now();
-      }
-      const intensity = toJmaIntensity(parseFloat(csv[2].split("*")[0]));
-      if (intensity !== lastJmaIntensity) {
         lastJmaIntensity = intensity;
-        if (
-          intensity !== undefined &&
-          intensity !== JmaForecastIntensity.zero
-        ) {
-          // FCM NOTIFY
-          firebaseApp
-            .messaging()
-            .send({
-              topic: "yumnumm-notify",
-              notification: {
-                title: "🫨 揺れ検出",
-                body: `震度${intensity}が観測されました。 ( ${csv[2]} )`,
-              },
-              apns: {
-                payload: {
-                  aps: {
-                    threadId: "yumnumm",
-                    alert: {
-                      title: "🫨 揺れ検出",
-                      body: `震度${intensity}が観測されました。 (${csv[2]})`,
-                      subtitle: "自宅 Raspberry PI 4",
-                    },
-                    mutableContent: true,
-                    contentAvailable: true,
-                    sound: {
-                      critical: true,
-                      volume: 0.0,
-                      name: "default",
-                    },
-                  },
-                },
-              },
-            })
-            .then((res) => {
-              console.log(res);
-            })
-            .catch((err) => {
-              console.error(err);
-            });
-        }
+        lastJmaIntensityUpdatedAt = Date.now();
+        client.publish(topic, data);
       }
 
       break;
@@ -107,7 +92,7 @@ port.on("data", (data: string) => {
         markAsXassDirty
       ) {
         markAsXassDirty = false;
-        client.publish(topic, trimmedText);
+        client.publish(topic, data);
         lastXsaccSendTime = Date.now();
       }
       break;
@@ -121,57 +106,3 @@ client.on("message", (topic, message) => {
     port.write("$XSHWI\r\n");
   }
 });
-
-function toJmaIntensity(param: number): JmaForecastIntensity | null {
-  /*
-    JmaForecastIntensity? get toJmaForecastIntensity => switch (this) {
-        < -0.5 => null,
-        < 0.5 => JmaForecastIntensity.zero,
-        < 1.5 => JmaForecastIntensity.one,
-        < 2.5 => JmaForecastIntensity.two,
-        < 3.5 => JmaForecastIntensity.three,
-        < 4.5 => JmaForecastIntensity.four,
-        < 5.0 => JmaForecastIntensity.fiveLower,
-        < 5.5 => JmaForecastIntensity.fiveUpper,
-        < 6.0 => JmaForecastIntensity.sixLower,
-        < 6.5 => JmaForecastIntensity.sixUpper,
-        _ => JmaForecastIntensity.seven,
-      };
-  */
-  if (param < -0.5) {
-    return null;
-  } else if (param < 0.5) {
-    return JmaForecastIntensity.zero;
-  } else if (param < 1.5) {
-    return JmaForecastIntensity.one;
-  } else if (param < 2.5) {
-    return JmaForecastIntensity.two;
-  } else if (param < 3.5) {
-    return JmaForecastIntensity.three;
-  } else if (param < 4.5) {
-    return JmaForecastIntensity.four;
-  } else if (param < 5.0) {
-    return JmaForecastIntensity.fiveLower;
-  } else if (param < 5.5) {
-    return JmaForecastIntensity.fiveUpper;
-  } else if (param < 6.0) {
-    return JmaForecastIntensity.sixLower;
-  } else if (param < 6.5) {
-    return JmaForecastIntensity.sixUpper;
-  } else {
-    return JmaForecastIntensity.seven;
-  }
-}
-
-enum JmaForecastIntensity {
-  zero = "0",
-  one = "1",
-  two = "2",
-  three = "3",
-  four = "4",
-  fiveLower = "5-",
-  fiveUpper = "5+",
-  sixLower = "6-",
-  sixUpper = "6+",
-  seven = "7",
-}
