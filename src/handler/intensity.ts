@@ -15,7 +15,7 @@ export class IntensityHandler {
       this.updateMaxIntensity(intensity);
       this.onUpdate(intensity);
     }
-    if (Date.now() - this.maxIntensityAt > 60 * 10 * 1000) {
+    if (Date.now() - this.maxIntensityAt > 60 * 1000) {
       this.updateMaxIntensity(intensity);
     }
   }
