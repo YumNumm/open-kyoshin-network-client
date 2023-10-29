@@ -58,9 +58,12 @@ const intensityHandler = new IntensityHandler((intensity: JmaIntensity) => {
     });
 });
 
-port.on("data", (data: string) => {
+port.on("data", (data: any) => {
   // split data by comma
-  const csv = data.replace(/(\r\n|\n|\r)/gm, "").split(",");
+  const csv = data
+    .toString()
+    .replace(/(\r\n|\n|\r)/gm, "")
+    .split(",");
   const type = csv[0];
   // console.log(trimmedText);
 
